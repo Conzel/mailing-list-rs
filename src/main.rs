@@ -184,7 +184,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Asking for final confirm
-    println!("Will now send the following email to the recognized addresses: \n\n{}", text);
+    println!("Will now send the following email to the recognized addresses: \n\n{}\n", text);
 
     // User input for finishing sendmail
     loop {
