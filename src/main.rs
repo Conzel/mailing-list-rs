@@ -11,6 +11,8 @@ use std::str::FromStr;
 use structopt::StructOpt;
 use text_io::read;
 use anyhow::{Context, anyhow};
+use rayon::prelude::*;
+use indicatif::ParallelProgressIterator;
 use toml;
 
 const CONFIG_FILENAME: &str = "mailsend.toml";
@@ -184,7 +186,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     // Asking for final confirm
-    println!("Will now send the following email to the recognized addresses: \n\n{}\n", text);
+    println!("Will now send the following email to the successfully parsed addresses: \n\n{}\n", text);
 
     // User input for finishing sendmail
     loop {
@@ -192,8 +194,8 @@ fn main() -> anyhow::Result<()> {
         io::stdout().flush()?;
         let input: String = read!("{}\n");
         if input == "y" || input == "Y" {
-            let send_result: Result<Vec<_>, _> =
-                correct_mailers.iter().map(SmtpMailer::send).collect();
+            let num_correct_mails = correct_mailers.len() as u64;
+            let send_result = correct_mailers.into_par_iter().progress_count(num_correct_mails).try_for_each(|mailer| mailer.send());
             match send_result {
                 Err(e) => println!("Failure occured during sending: {:#?}. \nSome mails may have been sent and others not.", e),
                 _ => println!("Successfully sent all emails"),
