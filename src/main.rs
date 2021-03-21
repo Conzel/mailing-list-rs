@@ -11,7 +11,7 @@ use smtp_mailer::*;
 const CONFIG_FILENAME: &str = "mailsend.toml";
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "TTC Mail Sending")]
+#[structopt(name = "mailing-list-rs")]
 struct CliOptions {
     /// Full or relative path to configuration file (from executable)
     #[structopt(short = "c", long)]
