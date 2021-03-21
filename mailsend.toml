@@ -1,0 +1,5 @@
+mailserver = "smtp.gmail.com"
+username   = "youraddress@gmail.com"
+password   = "yourgmailpassword"
+sender     = "youraddress@gmail.com"
+reply_to   = "youraddress@gmail.com"
