@@ -51,7 +51,13 @@ pub struct Attachment {
 
 impl Display for MailContent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n---\n{}", self.subject, self.body)
+        write!(f, "Content Type: {:#?}\n\n{}\n---\n{}", self.content_type, self.subject, self.body)
+    }
+}
+
+impl Display for Attachment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.filename)
     }
 }
 

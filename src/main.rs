@@ -92,6 +92,8 @@ fn main() -> anyhow::Result<()> {
         "Will now send the following email to the successfully parsed addresses: \n\n{}\n",
         text
     );
+    attachments.iter().enumerate().for_each(|(i,a)| println!("Attachment {}: {}", i+1, a));
+
     loop {
         print!("Proceed? [y/n] ");
         io::stdout().flush()?;
