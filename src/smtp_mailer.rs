@@ -1,15 +1,24 @@
 use anyhow::{anyhow, Context};
 use lettre::transport::smtp::authentication::Credentials;
-use lettre::{Message, SmtpTransport, Transport};
+use lettre::{
+    message::{header, MultiPart, SinglePart},
+    Message, SmtpTransport, Transport,
+};
 use serde::Deserialize;
+use std::ffi::OsStr;
 use std::fmt::{self, Display};
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use toml;
 
-pub type MailAddress = String;
+#[derive(Debug)]
+enum ContentType {
+    Html,
+    Plain,
+}
 
+pub type MailAddress = String;
 // Directly represented via a TOML file in which the user can configure the corresponding attributes
 #[derive(Deserialize, Debug)]
 pub struct MailConfiguration {
@@ -29,6 +38,7 @@ pub struct SmtpMailer {
 pub struct MailContent {
     subject: String,
     body: String,
+    content_type: ContentType,
 }
 
 impl Display for MailContent {
@@ -49,19 +59,38 @@ impl SmtpMailer {
             .with_context(|| format!("Invalid email address: {}", mail))
     }
 
+    fn create_mail(
+        recipient: &MailAddress,
+        content: &MailContent,
+        config: &MailConfiguration,
+    ) -> anyhow::Result<Message> {
+        // Mail with preliminary settings (from, reply to,...), content to be added
+        let mail_prelude = Message::builder()
+            .from(Self::parse_pretty_error(&config.sender)?)
+            .reply_to(Self::parse_pretty_error(&config.reply_to)?)
+            .to(Self::parse_pretty_error(&recipient)?)
+            .subject(content.subject.clone());
+        let email = match content.content_type {
+            ContentType::Html => mail_prelude.multipart(
+                MultiPart::alternative().singlepart(
+                    SinglePart::builder()
+                        .header(header::ContentType(
+                            "text/html; charset=utf8".parse().unwrap(),
+                        ))
+                        .body(content.body.clone()),
+                ),
+            ),
+            ContentType::Plain => mail_prelude.body(content.body.clone()),
+        };
+        Ok(email?)
+    }
+
     pub fn new(
         recipient: &MailAddress,
         content: &MailContent,
         config: &MailConfiguration,
     ) -> anyhow::Result<SmtpMailer> {
-        let email = Message::builder()
-            .from(Self::parse_pretty_error(&config.sender)?)
-            .reply_to(Self::parse_pretty_error(&config.reply_to)?)
-            .to(Self::parse_pretty_error(&recipient)?)
-            // implement content
-            .subject(content.subject.clone())
-            .body(content.body.clone())?;
-
+        let email = Self::create_mail(recipient, content, config)?;
         let creds = Credentials::new(config.username.to_string(), config.password.to_string());
 
         let mailer = SmtpTransport::relay(&config.mailserver)
@@ -113,11 +142,27 @@ where
     })?)
 }
 
+fn get_content_type<P>(file_path: P) -> anyhow::Result<ContentType> 
+where
+    P: AsRef<Path> + std::fmt::Debug,
+{
+    match file_path.as_ref().extension().and_then(OsStr::to_str) {
+        Some("html") => Ok(ContentType::Html),
+        Some("txt") => Ok(ContentType::Plain),
+        _ => Err(anyhow!(
+            "Unrecognized content file type: {:#?}. Only .txt and .html is allowed.", file_path
+        )),
+    }
+}
+
 pub fn parse_mail_content<P>(content_file: P) -> anyhow::Result<MailContent>
 where
     P: AsRef<Path> + std::fmt::Debug,
 {
     let file_content = get_file_content(&content_file)?;
+    let content_type = get_content_type(&content_file)?;
+
+    // Parse content for correct format
     let premature_end_msg = "Error while parsing mail content file: Premature end of content file. Content file needs to have format: Subject line, blank line, body.";
     let mut lines = file_content.lines();
     let subject = lines.next().with_context(|| premature_end_msg)?;
@@ -131,5 +176,6 @@ where
     Ok(MailContent {
         subject: subject.to_string(),
         body: body,
+        content_type: content_type,
     })
 }

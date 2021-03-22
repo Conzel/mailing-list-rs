@@ -21,7 +21,8 @@ struct CliOptions {
     #[structopt(short, long, parse(from_os_str))]
     recipients_file: PathBuf,
 
-    /// File containing content of email (format: subject line, blank line, mail text)
+    /// File containing content of email (format: subject line, blank line, mail text). Plaintext
+    /// or HTML
     #[structopt(short, long, parse(from_os_str))]
     text_file: PathBuf,
 
