@@ -122,7 +122,7 @@ where
     let mut lines = file_content.lines();
     let subject = lines.next().with_context(|| premature_end_msg)?;
     let sep = lines.next().with_context(|| premature_end_msg)?;
-    let body = lines.collect();
+    let body = lines.collect::<Vec<&str>>().join("\n");
 
     if !(sep.is_empty() || sep == "---") {
         return Err(anyhow!("Error while parsing mail content file: Line separator missing. \nSubject header and body must be separated by a blank line or three dashes (---)."));
