@@ -1,6 +1,5 @@
 # mailing-list-rs
-Simple example of how a mailing list can be implemented in Rust. Uses [lettre](https://github.com/lettre/lettre) to deliver mails via 
-a remote SMTP server (for example one as provided by GMail). 
+Simple example of how a mailing list can be implemented in Rust. Uses [lettre](https://github.com/lettre/lettre) to deliver mails via a remote SMTP server (for example one as provided by GMail). Supports plaintext, HTML and attachments (all via MIME).
 
 ## Usage
 Either download the binaries for your platforms under releases (Linux and Windows supported) or build them 
@@ -9,7 +8,7 @@ yourself.
 The binary is in the form of a Command Line Utility, which can be called with `--help` for more details. 
 In short: three file paths have to be supplied to the program via command line flags
 * -r or --recipients, a text file in which each line is a valid email address representing one recipient
-* -t or --text-file, a text file which contains the subject and mail text. The subject is on it's own line and is separated from the mail text body with a blank line (or a line containing only three dashes `---`). Plaintext files (.txt) and HTML files (.html) are accepted.
+* -t or --text-file, a text file which contains the subject and mail text. The subject is on it's own line and is separated from the mail text body with a blank line (or a line containing only three dashes `---`). Plaintext files (.txt) and HTML files (.html) are accepted. Non-7-bit ASCII (Umlaute...) don't play nice with plaintext, so use HTML in this case.
 * -c or --config-file, a TOML file containing the configuration information for the mail server. An example for a GMail connection is provided. If this option is left out, the program will search in the directory of the executable for a file called `mailsend.toml`. The required arguments are:
   * `mailserver`: Address of the SMTP Server that the mail should be sent to
   * `username`: Username used to authenticate against the SMTP server
@@ -17,10 +16,12 @@ In short: three file paths have to be supplied to the program via command line f
   * `sender`:   Mail address appearing in the sender field
   * `reply_to`: Mail address appearing in the reply_to field
 
+Optionally, attachments can be included using the -a or --attachments flag, followed by a path to a valid file. This option can be specified multiple times, once per attachment.
+
 Example call: 
-`./mailing-list-rs --recipients-file ./example-recipients.txt --text-file ./example-content.txt -config-file ./mailsend.toml`
+`./mailing-list-rs --recipients-file ./example-recipients.txt --text-file ./example-content.txt -config-file ./mailsend.toml --attachments ./example-attachment.txt`
 or shorter
-`./mailing-list-rs -r ./example-recipients.txt -t ./example-content.txt -c ./mailsend.toml`
+`./mailing-list-rs -r ./example-recipients.txt -t ./example-content.txt -c ./mailsend.toml -a ./example-attachment.txt`
 
 ## How to build
 1. Follow the Rust installation instructions in [the Rust book](https://doc.rust-lang.org/book/ch01-01-installation.html)
