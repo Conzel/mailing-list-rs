@@ -1,3 +1,6 @@
 Subject
 ---
-Email Body
+This is a test mail.
+
+Kind regards,
+A robot
