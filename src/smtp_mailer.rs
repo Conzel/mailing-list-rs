@@ -46,7 +46,7 @@ pub struct MailContent {
 #[derive(Debug)]
 pub struct Attachment {
     filename: String,
-    content: String, // bytes better?
+    content: Vec<u8>, // idiomatic rust binary content representation
 }
 
 impl Display for MailContent {
@@ -71,7 +71,7 @@ impl SmtpMailer {
         m.singlepart(
             SinglePart::builder()
                 .header(header::ContentType(
-                    "text/plain; charset=utf8".parse().unwrap(),
+                    "application/octet-stream".parse().unwrap(),
                 ))
                 .header(header::ContentDisposition {
                     disposition: header::DispositionType::Attachment,
@@ -81,7 +81,7 @@ impl SmtpMailer {
                         a.filename.as_bytes().into(),
                     )],
                 })
-                .body(a.content.to_string()),
+                .body(a.content.clone()),
         )
     }
 
@@ -223,14 +223,15 @@ where
 {
     let mut res = vec![];
     for p in attachment_paths.as_ref().unwrap_or(&vec![]) {
-        let content = get_file_content(&p)?;
+        let content_binary =
+            fs::read(&p).with_context(|| format!("Error parsing attachment at {:#?}", p))?;
         let name = p.as_ref().file_name().unwrap(); // line above returns err if file nonexistant
         res.push(Attachment {
             filename: name
                 .to_str()
                 .ok_or(anyhow!("Could not parse attachment at {:#?}", p))?
                 .to_string(),
-            content: content,
+            content: content_binary,
         });
     }
     Ok(res)
