@@ -9,7 +9,7 @@ yourself.
 The binary is in the form of a Command Line Utility, which can be called with `--help` for more details. 
 In short: three file paths have to be supplied to the program via command line flags
 * -r or --recipients, a text file in which each line is a valid email address representing one recipient
-* -t or --text-file, a text file which contains the subject and mail text. The subject is on it's own line and is separated from the mail text body with a blank line (or a line containing only three dashes `---`).
+* -t or --text-file, a text file which contains the subject and mail text. The subject is on it's own line and is separated from the mail text body with a blank line (or a line containing only three dashes `---`). Plaintext files (.txt) and HTML files (.html) are accepted.
 * -c or --config-file, a TOML file containing the configuration information for the mail server. An example for a GMail connection is provided. If this option is left out, the program will search in the directory of the executable for a file called `mailsend.toml`. The required arguments are:
   * `mailserver`: Address of the SMTP Server that the mail should be sent to
   * `username`: Username used to authenticate against the SMTP server
