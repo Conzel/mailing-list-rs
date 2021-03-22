@@ -29,6 +29,10 @@ struct CliOptions {
     /// Enables debugging mode (does not send mail but just prints output)
     #[structopt(long)]
     debug: bool,
+
+    /// Paths to attachments to include with email
+    #[structopt(short, long, parse(from_os_str))]
+    attachments: Option<Vec<PathBuf>>,
 }
 
 // Returns the configuration path: /abs/path/to/exec/CONFIG_FILENAME
@@ -44,6 +48,7 @@ fn main() -> anyhow::Result<()> {
     let opt = CliOptions::from_args();
     let text = parse_mail_content(&opt.text_file)?;
     let recipients = parse_recipients(&opt.recipients_file)?;
+    let attachments = parse_attachments(&opt.attachments)?;
     let config = parse_config(
         &opt.config_file
             .as_ref()
@@ -54,7 +59,7 @@ fn main() -> anyhow::Result<()> {
     let mut correct_mailers: Vec<SmtpMailer> = vec![];
     let mut errors: Vec<anyhow::Error> = vec![];
     for addr in &recipients {
-        match SmtpMailer::new(&addr, &text, &config) {
+        match SmtpMailer::new(&addr, &text, &config, &attachments) {
             Ok(mailer) => correct_mailers.push(mailer),
             Err(e) => errors.push(e),
         }

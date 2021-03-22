@@ -19,6 +19,8 @@ enum ContentType {
 }
 
 pub type MailAddress = String;
+pub type Attachments = Vec<Attachment>;
+
 // Directly represented via a TOML file in which the user can configure the corresponding attributes
 #[derive(Deserialize, Debug)]
 pub struct MailConfiguration {
@@ -41,6 +43,12 @@ pub struct MailContent {
     content_type: ContentType,
 }
 
+#[derive(Debug)]
+pub struct Attachment {
+    filename: String,
+    content: String, // bytes better?
+}
+
 impl Display for MailContent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}\n---\n{}", self.subject, self.body)
@@ -59,10 +67,29 @@ impl SmtpMailer {
             .with_context(|| format!("Invalid email address: {}", mail))
     }
 
+    fn add_attachment(a: &Attachment, m: MultiPart) -> MultiPart {
+        m.singlepart(
+            SinglePart::builder()
+                .header(header::ContentType(
+                    "text/plain; charset=utf8".parse().unwrap(),
+                ))
+                .header(header::ContentDisposition {
+                    disposition: header::DispositionType::Attachment,
+                    parameters: vec![header::DispositionParam::Filename(
+                        header::Charset::Ext("utf-8".into()),
+                        None,
+                        a.filename.as_bytes().into(),
+                    )],
+                })
+                .body(a.content.to_string()),
+        )
+    }
+
     fn create_mail(
         recipient: &MailAddress,
         content: &MailContent,
         config: &MailConfiguration,
+        attachments: &Attachments,
     ) -> anyhow::Result<Message> {
         // Mail with preliminary settings (from, reply to,...), content to be added
         let mail_prelude = Message::builder()
@@ -70,27 +97,36 @@ impl SmtpMailer {
             .reply_to(Self::parse_pretty_error(&config.reply_to)?)
             .to(Self::parse_pretty_error(&recipient)?)
             .subject(content.subject.clone());
-        let email = match content.content_type {
-            ContentType::Html => mail_prelude.multipart(
-                MultiPart::alternative().singlepart(
-                    SinglePart::builder()
-                        .header(header::ContentType(
-                            "text/html; charset=utf8".parse().unwrap(),
-                        ))
-                        .body(content.body.clone()),
-                ),
-            ),
-            ContentType::Plain => mail_prelude.body(content.body.clone()),
+
+        let mail_builder = MultiPart::mixed();
+        // Add Mail body
+        let header_content_type = match content.content_type {
+            ContentType::Html => header::ContentType("text/html; charset=utf8".parse().unwrap()),
+            ContentType::Plain => header::ContentType("text/plain; charset=utf8".parse().unwrap()),
         };
-        Ok(email?)
+        // MultiPart::mixed() gives us a mail builder, but after applying singlepart on it,
+        // we get a MultiPart, so this is a bit messy. I would ideally like to reuse the mail
+        // builder and just incrementally build on the single variable.
+        let mut mail_multipart = mail_builder.singlepart(
+            SinglePart::builder()
+                .header(header_content_type)
+                .body(content.body.clone()),
+        );
+
+        // Add attachments
+        for att in attachments {
+            mail_multipart = Self::add_attachment(att, mail_multipart);
+        }
+        Ok(mail_prelude.multipart(mail_multipart)?)
     }
 
     pub fn new(
         recipient: &MailAddress,
         content: &MailContent,
         config: &MailConfiguration,
+        attachments: &Attachments,
     ) -> anyhow::Result<SmtpMailer> {
-        let email = Self::create_mail(recipient, content, config)?;
+        let email = Self::create_mail(recipient, content, config, attachments)?;
         let creds = Credentials::new(config.username.to_string(), config.password.to_string());
 
         let mailer = SmtpTransport::relay(&config.mailserver)
@@ -142,7 +178,7 @@ where
     })?)
 }
 
-fn get_content_type<P>(file_path: P) -> anyhow::Result<ContentType> 
+fn get_content_type<P>(file_path: P) -> anyhow::Result<ContentType>
 where
     P: AsRef<Path> + std::fmt::Debug,
 {
@@ -150,7 +186,8 @@ where
         Some("html") => Ok(ContentType::Html),
         Some("txt") => Ok(ContentType::Plain),
         _ => Err(anyhow!(
-            "Unrecognized content file type: {:#?}. Only .txt and .html is allowed.", file_path
+            "Unrecognized content file type: {:#?}. Only .txt and .html is allowed.",
+            file_path
         )),
     }
 }
@@ -178,4 +215,23 @@ where
         body: body,
         content_type: content_type,
     })
+}
+
+pub fn parse_attachments<P>(attachment_paths: &Option<Vec<P>>) -> anyhow::Result<Attachments>
+where
+    P: AsRef<Path> + std::fmt::Debug,
+{
+    let mut res = vec![];
+    for p in attachment_paths.as_ref().unwrap_or(&vec![]) {
+        let content = get_file_content(&p)?;
+        let name = p.as_ref().file_name().unwrap(); // line above returns err if file nonexistant
+        res.push(Attachment {
+            filename: name
+                .to_str()
+                .ok_or(anyhow!("Could not parse attachment at {:#?}", p))?
+                .to_string(),
+            content: content,
+        });
+    }
+    Ok(res)
 }
